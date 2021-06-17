@@ -10,10 +10,3 @@ export const IssueWrapper = styled.div`
         font-weight: bold;
     }
 `
-export const AdBanner = styled.div`
-    text-align: center;
-    margin-bottom: 1rem;
-    & img {
-        vertical-align: bottom;
-    }
-`

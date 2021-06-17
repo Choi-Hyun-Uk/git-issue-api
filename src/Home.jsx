@@ -1,38 +1,59 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import IssueItem from '../components/issueItem';
-import { IssueWrapper, AdBanner } from './styles';
+import React, { useState, useRef, useCallback } from 'react';
+import { IssueWrapper } from './styles';
+import useIssueList from '../api/api';
+import IssueItem from '../components/IssueItem';
+import AdBanner from '../components/adBanner';
 
 const Home = () => {
-    const [issue, setIssue] = useState([]);
-    const [firstNumer, setFirstNumber] = useState(0);
-    const [lastNumer, setLastNumber] = useState(4);
+    const [pageNumber, setPageNumber] = useState(1);
+    const {issue, loading, error, hasMore} = useIssueList(pageNumber);
+    const ob = useRef();
 
-    useEffect(() => {
-        const fetchIssue = async () => {
-            const response = await axios.get('https://api.github.com/repos/angular/angular-cli/issues?state=open');
-            setIssue(response.data);
-        };
-        fetchIssue();
-    }, []);
+    const lastElementObserver = useCallback(node => {
+        if (loading) return;
+        if (ob.current) {
+            // console.log('ob.current :', ob.current);
+            // 감시 대상이 브라우저 view에 들어올 경우 연결 중지
+            // 이유는 현재 감시대상을 중지하고, 추가 목록을 불러오면서 마지막 광고배너 <li>에 감시 대상으로 옮기기 위해
+            ob.current.disconnect();
+        }
+        // 초기에는 undefinde 값을 가지고 있지만, rendering 후
+        // lastElementObserver를 가지고 있는 요소 발견 시 IntersectionObserver 인스턴스 생성
+        ob.current = new IntersectionObserver((entries) => {
+            // entries[0] - 현재 감시 중인 요소 중 0번째
+            // isIntersecting - 브라우저 모니터상에 노출되면 true
+            // hasMore - 더 불러오기 가능 여부
+            // console.log('entries :', entries);
+            if (entries[0].isIntersecting && hasMore && issue.length < 120) {
+                setPageNumber(prev => prev + 1);
+            }
+        });
+        if (node) {
+            // redering 중 lastElementObserver 가지고 있는 태그가 있다면 파라미터로 node에 태그 요소가 들어옴
+            // 들어오게 되고, if(node)가 true가 되는 동시에 observer.current.observe(node); 즉, 감시 대상으로 잡기 시작
+            // console.log('node :', node);
+            ob.current.observe(node);
+        }
+    }, [loading, hasMore, pageNumber, ob]);
 
-    const issuePage = issue.sort((prev, next) => next.comments - prev.comments).slice(firstNumer, lastNumer);
-    console.log(issuePage);
+    // console.log(issue);
     
     return (
         <>
             <IssueWrapper>
                 <h1>angular issue</h1>
                 <ul>
-                    {issuePage.map((item) => (
-                        <IssueItem key={item.id} item={item} />
-                    ))}
+                    {issue.map((item, index) =>
+                        (index+1) % 10 === 0
+                        ? (
+                            <div key={item.id}>
+                                <AdBanner lastElementObserver={lastElementObserver} length={issue.length} index={index} />
+                                <IssueItem item={item} />
+                            </div>
+                        )
+                        : <IssueItem key={item.number} item={item} />
+                    )}
                 </ul>
-                <AdBanner>
-                    <a href="https://thingsflow.com/ko/homea">
-                        <img src="http://placehold.it/500x100?text=ad" alt="광고배너이미지" />
-                    </a>
-                </AdBanner>
             </IssueWrapper>
         </>
     )
